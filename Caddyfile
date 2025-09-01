@@ -1,0 +1,32 @@
+{
+  email hello@dznery.com
+  admin "unix//run/caddy/admin.socket"
+
+  # Set this to disable the admin endpoint
+  admin off
+
+  # Optionally increase timeouts, etc.
+}
+
+# Python demo
+arena.dznery.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:8000
+  log {
+    output file /var/log/caddy/arena.access.log
+    # format single_field common_log
+    format console
+  }
+}
+
+# Elixir demo
+migrator.dznery.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:4000
+  log {
+    output file /var/log/caddy/migrator.access.log
+    # format single_field common_log
+    format console
+  }
+}
+

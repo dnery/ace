@@ -1,6 +1,4 @@
-## Assumptions
-
-- `ace` is aliased in local machine `hosts` file
+# General Purpose Arch VPS Configuration
 
 ## Initial Setup
 
@@ -25,7 +23,7 @@ pacman -Sc (clean cache)
 pacman -Syyu
 ```
 
-Rank mirrors, then update system:
+Rank mirrors and update system:
 ```bash
 pacman -S python reflector neovim
 
@@ -39,11 +37,9 @@ reflector \
 
 pacman -Syu
 
-# IMPORTANT
-mkinitcpio -P
+mkinitcpio -P  # DON'T FORGET!!!
 
-# IMPORTANT
-grub-mkconfig -o /boot/grub/grub.cfg
+grub-mkconfig -o /boot/grub/grub.cfg  # DON'T FORGET!!!
 ```
 
 **Now reboot the machine.**
@@ -56,52 +52,13 @@ pacman -S --noconfirm fish
 useradd -m -G wheel -s /bin/fish danilo
 passwd danilo
 
-# Copy over sshd conrfig
+# Copy over sshd config
 mkdir -p /home/danilo/.ssh
 cp .ssh/authorized_keys /home/danilo/.ssh/authorized_keys
 chown -R danilo:danilo /home/danilo/.ssh
 ```
 
-Create `/etc/sudoers.d/danilo` with:
-```conf
-## Suggestions pulled from default sudoers
-
-# This preserves proxy settings from user environments of root
-# equivalent users (group sudo)
-Defaults:%sudo env_keep += "http_proxy https_proxy ftp_proxy all_proxy no_proxy"
-
-# This allows running arbitrary commands, but so does ALL, and it means
-# different sudoers have their choice of editor respected.
-Defaults:%sudo env_keep += "EDITOR"
-
-# Completely harmless preservation of a user preference.
-Defaults:%sudo env_keep += "GREP_COLOR"
-
-# While you shouldn't normally run git as root, you need to with etckeeper
-Defaults:%sudo env_keep += "GIT_AUTHOR_* GIT_COMMITTER_*"
-
-# Per-user preferences; root won't have sensible values for them.
-Defaults:%sudo env_keep += "EMAIL DEBEMAIL DEBFULLNAME"
-
-# "sudo scp" or "sudo rsync" should be able to use your SSH agent.
-Defaults:%sudo env_keep += "SSH_AGENT_PID SSH_AUTH_SOCK"
-
-# Ditto for GPG agent
-Defaults:%sudo env_keep += "GPG_AGENT_INFO"
-
-## Custom configuration for my linuxbox user
-
-# Preserve my zsh config for christ's sakes
-# Defaults:%sudo env_keep += "ZDOTDIR"
-
-# Preserve my XDG user base just in case
-# TODO
-
-# Allow sudo no-password permissions
-danilo ALL=(ALL) NOPASSWD:ALL
-```
-
-**End session, restart as non-root user.**
+**Put/create the [sudoers file](danilo) in `/etc/sudoers.d/danilo`, end the session, and restart as non-root.**
 
 Now finalize hardening:
 ```bash
@@ -136,18 +93,7 @@ Install Fail2ban:
 sudo pacman -S --noconfirm fail2ban
 ```
 
-Create `/etc/fail2ban/jail.local` with:
-```conf
-[DEFAULT]
-bantime = 1h
-findtime = 15m
-maxretry = 5
-backend = systemd
-banaction = ufw
-
-[sshd]
-enabled = true
-```
+Put/create the [Jailfile](jail.local) in `/etc/fail2ban/jail.local`.
 
 Start `fail2ban` and check `sshd` status via client:
 ```bash
@@ -173,7 +119,7 @@ Now update UFW:
 sudo ufw deny ssh && sudo ufw allow in on tailscale0 to any port 22 proto tcp
 ```
 
-## Prepare for rootless Docker
+## Prepare for Rootless Docker
 
 Verify that `/etc/subuid` and `/etc/subgid` contain at least 65,536 subordinate UIDs/GIDs for the user.
 Here I have 65,536 subordinate UIDs/GIDs (231072-296607):
@@ -192,10 +138,7 @@ testuser:231072:65536
 ```
 
 Verify that `99-docker-rootless` conf is being added somewhere in the [docker-rootless-extras PKGBUILD.](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=docker-rootless-extras)
-If it's not, manually create the /etc/sysctl.d/99-rootless-docker.conf` file with:
-```conf
-kernel.unprivileged_userns_clone=1
-```
+If it's not, put/create the [rootless Docker config](99-my-rootless-docker.conf) in `/etc/sysctl.d/99-my-docker-rootless.conf`.
 
 And then run:
 ```fish
@@ -207,7 +150,7 @@ Now finally install Docker with optionals:
 sudo pacman -S --noconfirm docker docker-buildx pigz fuse-overlayfs
 ```
 
-## Install and start rootless Docker
+## Install and Start Rootless Docker
 
 ```fish
 # Install an AUR helper
@@ -244,3 +187,32 @@ Finally check that stuff runs **without `sudo`:**
 ```fish
 docker run -it --rm archlinux bash -c "echo hellow world"
 ```
+
+## Caddy (Global Reverse Proxy)
+
+
+```fish
+sudo pacman -S --noconfirm caddy
+sudo systemctl enable --now caddy
+```
+
+Put/create the [global Caddyfile](Caddyfile) in `/etc/caddy/Caddyfile`.
+
+Finalize the setup:
+```fish
+sudo mkdir -p /var/log/caddy
+sudo chown -R caddy:caddy /var/log/caddy
+sudo systemctl reload caddy
+```
+
+Initially, create **DNS-only** A-records in Cloudflare:
+- `arena.dznery.com` -> A -> VPS IPv4
+- `migrator.dznery.com` -> A -> VPS IPv4
+
+**Reload Caddy if needed,** accessing the URLs should give you `502`s. (NOT `525`s.)
+
+At this point the certificates are acquired and you can update the DNS config in Cloudflare:
+- `arena` -> CNAME -> `dznery.com`
+- `migrator` -> CNAME -> `dznery.com`
+
+**SSL/TLS mode should be set to "Full (strict)" as well.**

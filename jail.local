@@ -1,0 +1,9 @@
+[DEFAULT]
+bantime = 1h
+findtime = 15m
+maxretry = 5
+backend = systemd
+banaction = ufw
+
+[sshd]
+enabled = true
