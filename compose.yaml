@@ -1,0 +1,66 @@
+networks:
+  ace:
+    name: ace
+
+services:
+  # Safer Docker control surface for Homarr (no raw docker.sock in the dashboard)
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: socket-proxy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run
+    networks: [ace]
+    ports:
+      # loopback only, Caddy does the reverse-proxy
+      - "127.0.0.1:2375:2375"
+    volumes:
+      - /var/run/user/1001/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LOG_LEVEL=info
+      # Give Homarr only the permissions it needs
+      - CONTAINERS=1
+      - POST=0
+      # Homarr workaround: allow start/stop/restart even with POST=0
+      - ALLOW_START=1
+      - ALLOW_STOP=1
+      - ALLOW_RESTARTS=1
+
+  homarr:
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    networks: [ace]
+    # NO docker.sock mount here; we talk to socket-proxy instead
+    environment:
+      - SECRET_ENCRYPTION_KEY=${HOMARR_SECRET:-fix_homarr_encryption_key}
+      - DOCKER_HOSTNAMES=socket-proxy
+      - DOCKER_PORTS=2375
+    volumes:
+      - ./homarr/appdata:/appdata
+    ports:
+      # loopback only, Caddy does the reverse-proxy
+      - "127.0.0.1:7575:7575"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    networks: [ace]
+    volumes:
+      - /var/run/user/1001/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=America/Sao_Paulo
+      - WATCHTOWER_LABEL_ENABLE=true     # only touch containers explicitly labeled true
+      - WATCHTOWER_CLEANUP=true          # remove old images
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      # Poll interval: run every minute
+      - WATCHTOWER_POLL_INTERVAL=60
+      # Cron syntax: every minute
+      # - WATCHTOWER_SCHEDULE=0 */1 * * * *
+    # Optionally target only a scope
+    # command: ["--scope", "ace"]
+

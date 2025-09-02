@@ -1,32 +1,66 @@
+# The Caddyfile is an easy way to configure your Caddy web server.
+#
+# https://caddyserver.com/docs/caddyfile
+#
+# The configuration below serves a welcome page over HTTP on port 80.
+# To use your own domain name (with automatic HTTPS), first make
+# sure your domain's A/AAAA DNS records are properly pointed to
+# this machine's public IP, then replace the line below with your
+# domain name.
+#
+# https://caddyserver.com/docs/caddyfile/concepts#addresses
 {
-  email hello@dznery.com
-  admin "unix//run/caddy/admin.socket"
+        email hello@dznery.com
+        # Restrict the admin interface to a local unix file socket whose directory
+        # is restricted to caddy:caddy. By default the TCP socket allows arbitrary
+        # modification for any process and user that has access to the local
+        # interface. If admin over TCP is turned on one should make sure
+        # implications are well understood.
+        admin "unix//run/caddy/admin.socket"
 
-  # Set this to disable the admin endpoint
-  admin off
-
-  # Optionally increase timeouts, etc.
+        # OR turn admin off entirely
+        # admin off
 }
 
-# Python demo
+# http:// {
+#       # Set this path to your site's directory.
+#       root * /usr/share/caddy
+#
+#       # Enable the static file server.
+#       file_server
+#
+#       # Another common task is to set up a reverse proxy:
+#       # reverse_proxy localhost:8080
+#
+#       # Or serve a PHP site through php-fpm:
+#       # php_fastcgi localhost:9000
+#
+#       # Refer to the directive documentation for more options.
+#       # https://caddyserver.com/docs/caddyfile/directives
+# }
+
+
+# Session arena
 arena.dznery.com {
-  encode zstd gzip
-  reverse_proxy 127.0.0.1:8000
-  log {
-    output file /var/log/caddy/arena.access.log
-    # format single_field common_log
-    format console
-  }
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:8000
+        log {
+                output file /var/log/caddy/arena.access.log
+		# format single_field common_log
+                format console
+        }
 }
 
-# Elixir demo
+# Migrator
 migrator.dznery.com {
-  encode zstd gzip
-  reverse_proxy 127.0.0.1:4000
-  log {
-    output file /var/log/caddy/migrator.access.log
-    # format single_field common_log
-    format console
-  }
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:4000
+        log {
+                output file /var/log/caddy/migrator.access.log
+		# format single_field common_log
+                format console
+        }
 }
 
+# Import additional caddy config files in /etc/caddy/conf.d/
+import /etc/caddy/conf.d/*
